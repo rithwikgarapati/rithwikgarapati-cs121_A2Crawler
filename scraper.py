@@ -2,10 +2,28 @@ import re
 from urllib.parse import urlparse, urldefrag
 from bs4 import BeautifulSoup
 
+"""
+1. checksum for detecting duplicate pages - JEREMY
+2. How many unique pages did you find? - RITHWIK
+3. What is the longest page in terms of the number of words? - RITHWIK
+4. What are the 50 most common words in the entire set of pages crawled under these domains ? - Assignment 1 - RITHWIK
+5. How many subdomains did you find in the ics.uci.edu domain ex: hpi.ics.uci.edu - RITHWIK
+6. Detect redirects and if the page redirects your crawler, index the redirected content - JEREMY
+7. Detect and avoid dead URLs that return a 200 status but no data - JEREMY
+8. Detect and avoid crawling very large files, especially if they have low information value (avoid pages that are
+    too long and pages too short - threshold) - RITHWIK
+9. You should write simple automatic trap detection systems based on repeated URL patterns and/or (ideally) webpage content similarity repetition over a certain amount of chained pages (the threshold definition is up to you!).
+
+
+
+
+"""
 
 def scraper(url, resp):
     links = extract_next_links(url, resp)
-    return [link for link in links if is_valid(link)]
+    valid_links = [link for link in links if is_valid(link)]
+    print(valid_links)
+    return valid_links
 
 
 def extract_next_links(url, resp):
@@ -41,7 +59,11 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
 
-        valid_domain = any(parsed.hostname.endswith(domain) for domain in allowed_domains)
+        valid_domain = False
+        for domain in allowed_domains:
+            if parsed.hostname.endswith(domain):
+                valid_domain = True
+                break
 
         return valid_domain and not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
