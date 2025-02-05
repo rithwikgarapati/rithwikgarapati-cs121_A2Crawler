@@ -6,9 +6,12 @@ from bs4 import BeautifulSoup
 
 
 def scraper(url, resp):
+    print("Extracting starting")
     links = extract_next_links(url, resp)
+    print("Extracting done")
+    print("Link validation starting")
     valid_links = [link for link in links if is_valid(link)]
-
+    print("Link validation done")
     return valid_links
 
 
@@ -32,11 +35,15 @@ def extract_next_links(url, resp):
     hyperlinks = []
     for a in soup.find_all('a', href=True):
         # De-frag the url
-        clean_url, fragment = urldefrag(a)
+        # clean_url, fragment = urldefrag(a)
 
         # Avoid the same exact url
-        if clean_url != url:
-            hyperlinks.append(a)
+        # if clean_url != url:
+        # Add only urls, not triggers
+        hyperlink_url = a["href"]
+        if urlparse(hyperlink_url).scheme in {"http", "https"}:
+            hyperlinks.append(hyperlink_url)
+            print(f"Hyperlink: {hyperlink_url}")
 
     return hyperlinks
 
@@ -50,10 +57,10 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
         # url must be in uci domain
-        if parsed.hostname not in {"ics.uci.edu",
-                                   "cs.uci.edu",
-                                   "informatics.uci.edu",
-                                   "stat.uci.edu"}:
+        if not (parsed.hostname.endswith("ics.uci.edu")
+                or parsed.hostname.endswith("cs.uci.edu")
+                or parsed.hostname.endswith("informatics.uci.edu")
+                or parsed.hostname.endswith("stat.uci.edu")):
             return False
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
