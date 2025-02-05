@@ -5,12 +5,18 @@ from urllib.parse import urlparse, urldefrag
 from bs4 import BeautifulSoup
 
 
+# check sum
 def scraper(url, resp):
     print("Extracting starting")
     links = extract_next_links(url, resp)
     print("Extracting done")
     print("Link validation starting")
-    valid_links = [link for link in links if is_valid(link)]
+    valid_links = []
+    for link in links:
+        if is_valid(link):
+            valid_links.append(link)
+            print(f"Valid link: {link}")
+    # valid_links = [link for link in links if is_valid(link)]
     print("Link validation done")
     return valid_links
 
@@ -43,7 +49,7 @@ def extract_next_links(url, resp):
         hyperlink_url = a["href"]
         if urlparse(hyperlink_url).scheme in {"http", "https"}:
             hyperlinks.append(hyperlink_url)
-            print(f"Hyperlink: {hyperlink_url}")
+            # print(f"Hyperlink: {hyperlink_url}")
 
     return hyperlinks
 
