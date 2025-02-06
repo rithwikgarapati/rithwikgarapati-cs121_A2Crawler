@@ -1,23 +1,58 @@
 import re
 from urllib.parse import urlparse, urldefrag
+import hashlib
 
 # Parses HTML
 from bs4 import BeautifulSoup
 
 
+checksums = set()
+urls = set()
+
+
+# Ensure all URLs do NOT end with '/'
+def remove_trailing_slash(url):
+    parsed = urlparse(url)
+    if parsed.path.endswith('/'):
+        return parsed.geturl()[:-1]  # Remove last character if it's a slash
+    return parsed.geturl()
+
+
+def get_md5_checksum(text):
+    return hashlib.md5(text.encode()).hexdigest()
+
 # check sum
 def scraper(url, resp):
-    print("Extracting starting")
+    # # Duplicate urls
+    # if url in urls:
+    #     print(f"Duplicate URL: {url}")
+    #     return list()
+    # urls.add(remove_trailing_slash(url))
+    # Redirects
+    if resp.status == 300:
+        return list()
+    # Errors
+    if resp.status != 200:
+        return list()
+
+    # Parse html, get text, and calculate checksum
+    soup = BeautifulSoup(resp.raw_response.content, "html.parser")
+    text = soup.get_text()
+    checksum = get_md5_checksum(text)
+
+    # Don't scrape duplicates
+    if checksum in checksums:
+        print(f"Checksum: {checksum}, URL: {url}")
+        return list()
+    checksums.add(checksum)
+
     links = extract_next_links(url, resp)
-    print("Extracting done")
-    print("Link validation starting")
     valid_links = []
     for link in links:
         if is_valid(link):
             valid_links.append(link)
             print(f"Valid link: {link}")
-    # valid_links = [link for link in links if is_valid(link)]
-    print("Link validation done")
+    print(f"HERE ARE THE URLS: {urls}")
     return valid_links
 
 
@@ -47,8 +82,9 @@ def extract_next_links(url, resp):
         # if clean_url != url:
         # Add only urls, not triggers
         hyperlink_url = a["href"]
-        if urlparse(hyperlink_url).scheme in {"http", "https"}:
-            hyperlinks.append(hyperlink_url)
+        parsed_url = urlparse(hyperlink_url)
+        if parsed_url.scheme in {"http", "https"}:
+            hyperlinks.append(remove_trailing_slash(hyperlink_url))
             # print(f"Hyperlink: {hyperlink_url}")
 
     return hyperlinks
@@ -68,6 +104,11 @@ def is_valid(url):
                 or parsed.hostname.endswith("informatics.uci.edu")
                 or parsed.hostname.endswith("stat.uci.edu")):
             return False
+        # No duplicate urls
+        if remove_trailing_slash(url) in urls:
+            return False
+        urls.add(remove_trailing_slash(url))
+
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
