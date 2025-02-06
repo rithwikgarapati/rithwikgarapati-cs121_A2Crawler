@@ -5,7 +5,6 @@ import hashlib
 # Parses HTML
 from bs4 import BeautifulSoup
 
-
 checksums = set()
 urls = set()
 
@@ -47,9 +46,9 @@ def scraper(url, resp):
     for link in links:
         if is_valid(link):
             valid_links.append(link)
-            print(f"Valid link: {link}")
-    print(f"HERE ARE THE URLS: {urls}")
-    print(f"THESE ARE THE CHECKSUMS: {checksums}")
+            # print(f"Valid link: {link}")
+    # print(f"HERE ARE THE URLS: {urls}")
+    # print(f"THESE ARE THE CHECKSUMS: {checksums}")
     return valid_links
 
 
@@ -96,10 +95,11 @@ def is_valid(url):
         if parsed.scheme not in set(["http", "https"]):
             return False
         # url must be in uci domain
-        if not (parsed.hostname.endswith("ics.uci.edu")
-                or parsed.hostname.endswith("cs.uci.edu")
-                or parsed.hostname.endswith("informatics.uci.edu")
-                or parsed.hostname.endswith("stat.uci.edu")):
+        if (parsed.hostname is None
+                or not (parsed.hostname.endswith("ics.uci.edu")
+                        or parsed.hostname.endswith("cs.uci.edu")
+                        or parsed.hostname.endswith("informatics.uci.edu")
+                        or parsed.hostname.endswith("stat.uci.edu"))):
             return False
         # No duplicate urls
         if remove_trailing_slash(url) in urls:
