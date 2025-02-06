@@ -1,18 +1,15 @@
 import re
 from urllib.parse import urlparse, urldefrag, urlunparse
-import hashlib
-
-# Parses HTML
-from bs4 import BeautifulSoup
-
+import hashlib  # Checksum
 import logging
+from bs4 import BeautifulSoup  # Parse HTML
 
 
 # Configure logging to write to a file
 logging.basicConfig(filename="output.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
-checksums = set()
-urls = set()
+CHECKSUMS = set()
+URLS = set()
 
 
 def remove_trailing_slash(url: str) -> str:
@@ -25,6 +22,18 @@ def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
 
+def is_close_path(url: str) -> bool:
+    date_pattern = re.compile(r'(\b\d{4}-\d{2}-\d{2}\b)')
+    match = date_pattern.search(url)
+    if match:
+        base_url = url.replace(match.group(0), "DATE")  # Normalize by replacing the date
+        if base_url in URLS:
+            logging.info(f"SIMILAR URL: {url}")
+            return True
+        URLS.add(base_url)
+    return False
+
+
 def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
         return list()
@@ -32,12 +41,16 @@ def scraper(url: str, resp) -> list:
     # Need to check robots.txt
 
     # Need to check for close path
+    # if is_close_path(url):
+    #     logging.info(f"PATH TOO SIMILAR: {url}")
+    #     return list()
 
     # Redirects
     if resp.status == 300:
         print(f"REDIRECT: {url}")
         logging.info(f"REDIRECT: {url}")
         return list()
+
     # Errors
     if resp.status != 200:
         return list()
@@ -51,16 +64,16 @@ def scraper(url: str, resp) -> list:
     checksum = get_md5_checksum(text)
 
     # Don't scrape pages with duplicate checksum
-    if checksum in checksums:
+    if checksum in CHECKSUMS:
         print(f"Checksum: {checksum}, URL: {url}")
         logging.info(f"Checksum: {checksum}, URL: {url}")
         return list()
-    checksums.add(checksum)
+    CHECKSUMS.add(checksum)
 
     links = extract_next_links(url, resp)
     valid_links = []
     for link in links:
-        if is_valid(link):
+        if is_valid(link) and not is_close_path(link):
             valid_links.append(link)
             # print(f"Valid link: {link}")
             logging.info(f"Valid link: {link}")
@@ -119,9 +132,9 @@ def is_valid(url: str) -> bool:
                         or parsed.hostname.endswith("stat.uci.edu"))):
             return False
         # No duplicate urls
-        if remove_trailing_slash(url) in urls:
+        if remove_trailing_slash(url) in URLS:
             return False
-        urls.add(remove_trailing_slash(url))
+        URLS.add(remove_trailing_slash(url))
 
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
