@@ -22,12 +22,18 @@ def get_md5_checksum(text):
 
 
 def scraper(url, resp):
+    if resp is None or resp.raw_response is None:
+        return list()
+
     # Redirects
     if resp.status == 300:
         print(f"REDIRECT: {url}")
         return list()
     # Errors
     if resp.status != 200:
+        return list()
+
+    if resp.raw_response is None:
         return list()
 
     # Parse html, get text, and calculate checksum
