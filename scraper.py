@@ -5,11 +5,18 @@ import hashlib
 # Parses HTML
 from bs4 import BeautifulSoup
 
+import logging
+
+
+# Configure logging to write to a file
+logging.basicConfig(filename="output.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 checksums = set()
 urls = set()
 
 
 # Ensure all URLs do NOT end with '/'
+# Need to fix, removing last char of query
 def remove_trailing_slash(url):
     parsed = urlparse(url)
     if parsed.path.endswith('/'):
@@ -25,9 +32,14 @@ def scraper(url, resp):
     if resp is None or resp.raw_response is None:
         return list()
 
+    # Need to check robots.txt
+
+    # Need to check for close path
+
     # Redirects
     if resp.status == 300:
         print(f"REDIRECT: {url}")
+        logging.info(f"REDIRECT: {url}")
         return list()
     # Errors
     if resp.status != 200:
@@ -44,6 +56,7 @@ def scraper(url, resp):
     # Don't scrape pages with duplicate checksum
     if checksum in checksums:
         print(f"Checksum: {checksum}, URL: {url}")
+        logging.info(f"Checksum: {checksum}, URL: {url}")
         return list()
     checksums.add(checksum)
 
@@ -53,6 +66,7 @@ def scraper(url, resp):
         if is_valid(link):
             valid_links.append(link)
             # print(f"Valid link: {link}")
+            logging.info(f"Valid link: {link}")
     # print(f"HERE ARE THE URLS: {urls}")
     # print(f"THESE ARE THE CHECKSUMS: {checksums}")
     return valid_links
