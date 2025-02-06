@@ -21,15 +21,11 @@ def remove_trailing_slash(url):
 def get_md5_checksum(text):
     return hashlib.md5(text.encode()).hexdigest()
 
-# check sum
+
 def scraper(url, resp):
-    # # Duplicate urls
-    # if url in urls:
-    #     print(f"Duplicate URL: {url}")
-    #     return list()
-    # urls.add(remove_trailing_slash(url))
     # Redirects
     if resp.status == 300:
+        print(f"REDIRECT: {url}")
         return list()
     # Errors
     if resp.status != 200:
@@ -40,7 +36,7 @@ def scraper(url, resp):
     text = soup.get_text()
     checksum = get_md5_checksum(text)
 
-    # Don't scrape duplicates
+    # Don't scrape pages with duplicate checksum
     if checksum in checksums:
         print(f"Checksum: {checksum}, URL: {url}")
         return list()
@@ -53,6 +49,7 @@ def scraper(url, resp):
             valid_links.append(link)
             print(f"Valid link: {link}")
     print(f"HERE ARE THE URLS: {urls}")
+    print(f"THESE ARE THE CHECKSUMS: {checksums}")
     return valid_links
 
 
