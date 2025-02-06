@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlparse, urldefrag
+from urllib.parse import urlparse, urldefrag, urlunparse
 import hashlib
 
 # Parses HTML
@@ -15,20 +15,17 @@ checksums = set()
 urls = set()
 
 
-# Ensure all URLs do NOT end with '/'
-# Need to fix, removing last char of query
-def remove_trailing_slash(url):
+def remove_trailing_slash(url: str) -> str:
     parsed = urlparse(url)
-    if parsed.path.endswith('/'):
-        return parsed.geturl()[:-1]  # Remove last character if it's a slash
-    return parsed.geturl()
+    new_parsed = (parsed.scheme, parsed.netloc, parsed.path.rstrip('/'), parsed.params, parsed.query, parsed.fragment)
+    return urlunparse(new_parsed)
 
 
-def get_md5_checksum(text):
+def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
 
-def scraper(url, resp):
+def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
         return list()
 
@@ -72,7 +69,7 @@ def scraper(url, resp):
     return valid_links
 
 
-def extract_next_links(url, resp):
+def extract_next_links(url: str, resp) -> list:
     # Implementation required.
     # url: the URL that was used to get the page
     # resp.url: the actual url of the page
@@ -106,7 +103,7 @@ def extract_next_links(url, resp):
     return hyperlinks
 
 
-def is_valid(url):
+def is_valid(url: str) -> bool:
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
