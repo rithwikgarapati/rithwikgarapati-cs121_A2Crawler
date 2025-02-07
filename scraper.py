@@ -1,4 +1,8 @@
 import re
+from urllib.parse import urlparse, urldefrag, urlunparse
+import hashlib  # Checksum
+import logging
+from bs4 import BeautifulSoup  # Parse HTML
 
 """
 1. checksum for detecting duplicate pages - JEREMY
@@ -11,22 +15,39 @@ import re
 8. Detect and avoid crawling very large files, especially if they have low information value (avoid pages that are
     too long and pages too short - threshold) - RITHWIK
 9. You should write simple automatic trap detection systems based on repeated URL patterns and/or (ideally) webpage content similarity repetition over a certain amount of chained pages (the threshold definition is up to you!).
-
-
-
-
 """
-from urllib.parse import urlparse, urldefrag, urlunparse
-import hashlib  # Checksum
-import logging
-from bs4 import BeautifulSoup  # Parse HTML
 
+
+class Statistics:
+    def __init__(self):
+        self.unique_urls = set()
+        self.longest_page = {
+            "words": 0,
+            "url": ""
+        }
+
+    def update_longest_page(self, num_words, urls):
+        if num_words > self.longest_page["words"]:
+            self.longest_page["words"] = num_words
+            self.longest_page["urls"] = urls
+
+    def update_unique_urls(self, url):
+        self.unique_urls.add(url)
+
+    def get_num_unique_urls(self):
+        return len(self.unique_urls)
+
+    def get_unique_urls(self):
+        return self.unique_urls
+
+
+# URL stats to answer all questions
+url_stats = Statistics()
 
 # Configure logging to write to a file
 logging.basicConfig(filename="output.log", level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
 
 CHECKSUMS = set()
-URLS = set()
 
 
 def remove_trailing_slash(url: str) -> str:
@@ -39,15 +60,16 @@ def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
 
+# To detect loops in calenders.
 def is_close_path(url: str) -> bool:
     date_pattern = re.compile(r'(\b\d{4}-\d{2}-\d{2}\b)')
     match = date_pattern.search(url)
     if match:
         base_url = url.replace(match.group(0), "DATE")  # Normalize by replacing the date
-        if base_url in URLS:
+        if base_url in url_stats.get_unique_urls():
             logging.info(f"SIMILAR URL: {url}")
             return True
-        URLS.add(base_url)
+        url_stats.update_unique_urls(base_url)
     return False
 
 
@@ -93,10 +115,16 @@ def scraper(url: str, resp) -> list:
     for link in links:
         if is_valid(link) and not is_close_path(link):
             valid_links.append(link)
-            # print(f"Valid link: {link}")
             logging.info(f"Valid link: {link}")
-    # print(f"HERE ARE THE URLS: {urls}")
-    # print(f"THESE ARE THE CHECKSUMS: {checksums}")
+
+            # to get all unique urls
+            url_stats.update_unique_urls(link)
+
+            # to get longest 
+
+
+
+
     return valid_links
 
 
@@ -151,9 +179,9 @@ def is_valid(url: str) -> bool:
                         or parsed.hostname.endswith("stat.uci.edu"))):
             return False
         # No duplicate urls
-        if remove_trailing_slash(url) in URLS:
+        if remove_trailing_slash(url) in url_stats.get_unique_urls():
             return False
-        URLS.add(remove_trailing_slash(url))
+        url_stats.update_unique_urls(remove_trailing_slash(url))
 
         return not re.match(
 
@@ -167,28 +195,8 @@ def is_valid(url: str) -> bool:
             + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
 
     except TypeError:
-        print("TypeError for ", parsed)
+        print("TypeError for ", url)
         raise
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-if __name__ == '__main__':
-    test_urls()
