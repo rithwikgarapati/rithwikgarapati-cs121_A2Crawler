@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlparse, urldefrag, urlunparse
+from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
@@ -24,6 +24,8 @@ def get_md5_checksum(text: str):
 
 
 # https://wics.ics.uci.edu/events/category/social-gathering/2020-09/
+# Also need to skip ical
+# https://ics.uci.edu/event/state-of-the-informatics-department?ical=1
 def is_close_path(url: str) -> bool:
     date_pattern = re.compile(r'(\b\d{4}-\d{2}-\d{2}\b)')
     date_pattern2 = re.compile(r'(\b\d{4}-\d{2}\b)')
@@ -128,6 +130,10 @@ def is_valid(url: str) -> bool:
                         or parsed.hostname.endswith("informatics.uci.edu")
                         or parsed.hostname.endswith("stat.uci.edu"))):
             return False
+        # Skip ical download links
+        query_params = parse_qs(parsed.query)
+        if any(key.lower() == "ical" for key in query_params):
+            return False
         # No duplicate urls
         if remove_trailing_slash(url) in URLS:
             return False
@@ -141,7 +147,7 @@ def is_valid(url: str) -> bool:
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics)$", parsed.path.lower())
 
     except TypeError:
         print("TypeError for ", parsed)
