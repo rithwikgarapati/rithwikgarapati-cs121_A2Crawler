@@ -47,12 +47,12 @@ def scraper(url: str, resp) -> list:
 
     # Redirects
     if resp.status == 300:
-        logging.info(f"REDIRECT: {url}")
+        logging.info(f"REDIRECT, Status: {resp.status} URL: {url}")
         return list()
 
     # Errors
     if resp.status != 200:
-        logging.info(f"ERROR, Status:{resp.status} URL:{url}")
+        logging.info(f"ERROR, Status: {resp.status} URL:{url}")
         return list()
 
     # Parse html, get text, and calculate checksum
@@ -62,7 +62,7 @@ def scraper(url: str, resp) -> list:
 
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
-        logging.info(f"DUPLICATE, Checksum: {checksum}, URL: {url}")
+        logging.info(f"DUPLICATE PAGE, Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
 
@@ -70,10 +70,11 @@ def scraper(url: str, resp) -> list:
     valid_links = []
     for link in links:
         if is_valid(link) and not is_close_path(link):
-            logging.info(f"HOSTNAME: {urlparse(link).hostname}, LINK: {link}")
             URLS.add(remove_trailing_slash(link))
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
+        else:
+            logging.info(f"Filtered link: {link}")
     # print(f"HERE ARE THE URLS: {urls}")
     # print(f"THESE ARE THE CHECKSUMS: {checksums}")
     return valid_links
