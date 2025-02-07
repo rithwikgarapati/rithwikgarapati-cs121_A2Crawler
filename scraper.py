@@ -22,9 +22,12 @@ def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
 
+
+# https://wics.ics.uci.edu/events/category/social-gathering/2020-09/
 def is_close_path(url: str) -> bool:
     date_pattern = re.compile(r'(\b\d{4}-\d{2}-\d{2}\b)')
-    match = date_pattern.search(url)
+    date_pattern2 = re.compile(r'(\b\d{4}-\d{2}\b)')
+    match = date_pattern.search(url) or date_pattern2.search(url)
     if match:
         base_url = url.replace(match.group(0), "DATE")  # Normalize by replacing the date
         if base_url in URLS:
@@ -36,14 +39,10 @@ def is_close_path(url: str) -> bool:
 
 def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
+        logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
 
     # Need to check robots.txt
-
-    # Need to check for close path
-    # if is_close_path(url):
-    #     logging.info(f"PATH TOO SIMILAR: {url}")
-    #     return list()
 
     # Redirects
     if resp.status == 300:
@@ -53,9 +52,7 @@ def scraper(url: str, resp) -> list:
 
     # Errors
     if resp.status != 200:
-        return list()
-
-    if resp.raw_response is None:
+        logging.info(f"ERROR, Status:{resp.status} URL:{url}")
         return list()
 
     # Parse html, get text, and calculate checksum
@@ -65,8 +62,8 @@ def scraper(url: str, resp) -> list:
 
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
-        print(f"Checksum: {checksum}, URL: {url}")
-        logging.info(f"Checksum: {checksum}, URL: {url}")
+        print(f"DUPLICATE, Checksum: {checksum}, URL: {url}")
+        logging.info(f"DUPLICATE, Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
 
