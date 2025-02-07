@@ -120,7 +120,8 @@ def is_valid(url: str) -> bool:
             return False
         # Check for correct hostname
         if (parsed.hostname is None
-                or parsed.hostname.endswith("cecs.uci.edu")
+                or (parsed.hostname.endswith("cecs.uci.edu")
+                    or parsed.hostname.endswith("eecs.uci.edu"))
                 or not (parsed.hostname.endswith("ics.uci.edu")
                         or parsed.hostname.endswith("cs.uci.edu")
                         or parsed.hostname.endswith("informatics.uci.edu")
