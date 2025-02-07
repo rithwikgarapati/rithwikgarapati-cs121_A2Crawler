@@ -1,4 +1,21 @@
 import re
+
+"""
+1. checksum for detecting duplicate pages - JEREMY
+2. How many unique pages did you find? - RITHWIK
+3. What is the longest page in terms of the number of words? - RITHWIK
+4. What are the 50 most common words in the entire set of pages crawled under these domains ? - Assignment 1 - RITHWIK
+5. How many subdomains did you find in the ics.uci.edu domain ex: hpi.ics.uci.edu - RITHWIK
+6. Detect redirects and if the page redirects your crawler, index the redirected content - JEREMY
+7. Detect and avoid dead URLs that return a 200 status but no data - JEREMY
+8. Detect and avoid crawling very large files, especially if they have low information value (avoid pages that are
+    too long and pages too short - threshold) - RITHWIK
+9. You should write simple automatic trap detection systems based on repeated URL patterns and/or (ideally) webpage content similarity repetition over a certain amount of chained pages (the threshold definition is up to you!).
+
+
+
+
+"""
 from urllib.parse import urlparse, urldefrag, urlunparse
 import hashlib  # Checksum
 import logging
@@ -71,6 +88,7 @@ def scraper(url: str, resp) -> list:
     CHECKSUMS.add(checksum)
 
     links = extract_next_links(url, resp)
+
     valid_links = []
     for link in links:
         if is_valid(link) and not is_close_path(link):
@@ -92,6 +110,7 @@ def extract_next_links(url: str, resp) -> list:
     #         resp.raw_response.url: the url, again
     #         resp.raw_response.content: the content of the page!
     # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+    
     if resp.status != 200:
         return list()
 
@@ -101,16 +120,14 @@ def extract_next_links(url: str, resp) -> list:
     # Extract all hyperlinks
     hyperlinks = []
     for a in soup.find_all('a', href=True):
-        # De-frag the url
-        # clean_url, fragment = urldefrag(a)
-
-        # Avoid the same exact url
-        # if clean_url != url:
-        # Add only urls, not triggers
+        
         hyperlink_url = a["href"]
+        # De-frag the url
+        defragmented_url, fragment = urldefrag(hyperlink_url)
         parsed_url = urlparse(hyperlink_url)
+        # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
-            hyperlinks.append(remove_trailing_slash(hyperlink_url))
+            hyperlinks.append(remove_trailing_slash(defragmented_url))
             # print(f"Hyperlink: {hyperlink_url}")
 
     return hyperlinks
@@ -120,10 +137,12 @@ def is_valid(url: str) -> bool:
     # Decide whether to crawl this url or not. 
     # If you decide to crawl it, return True; otherwise return False.
     # There are already some conditions that return False.
+
     try:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+
         # url must be in uci domain
         if (parsed.hostname is None
                 or not (parsed.hostname.endswith("ics.uci.edu")
@@ -137,6 +156,7 @@ def is_valid(url: str) -> bool:
         URLS.add(remove_trailing_slash(url))
 
         return not re.match(
+
             r".*\.(css|js|bmp|gif|jpe?g|ico"
             + r"|png|tiff?|mid|mp2|mp3|mp4"
             + r"|wav|avi|mov|mpeg|ram|m4v|mkv|ogg|ogv|pdf"
@@ -149,3 +169,26 @@ def is_valid(url: str) -> bool:
     except TypeError:
         print("TypeError for ", parsed)
         raise
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+if __name__ == '__main__':
+    test_urls()
