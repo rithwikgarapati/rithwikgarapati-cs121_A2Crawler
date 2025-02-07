@@ -22,7 +22,6 @@ def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
 
-
 # https://wics.ics.uci.edu/events/category/social-gathering/2020-09/
 # Also need to skip ical
 # https://ics.uci.edu/event/state-of-the-informatics-department?ical=1
@@ -48,7 +47,6 @@ def scraper(url: str, resp) -> list:
 
     # Redirects
     if resp.status == 300:
-        print(f"REDIRECT: {url}")
         logging.info(f"REDIRECT: {url}")
         return list()
 
@@ -64,7 +62,6 @@ def scraper(url: str, resp) -> list:
 
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
-        print(f"DUPLICATE, Checksum: {checksum}, URL: {url}")
         logging.info(f"DUPLICATE, Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
@@ -73,8 +70,9 @@ def scraper(url: str, resp) -> list:
     valid_links = []
     for link in links:
         if is_valid(link) and not is_close_path(link):
+            logging.info(f"HOSTNAME: {urlparse(link).hostname}, LINK: {link}")
+            URLS.add(remove_trailing_slash(link))
             valid_links.append(link)
-            # print(f"Valid link: {link}")
             logging.info(f"Valid link: {link}")
     # print(f"HERE ARE THE URLS: {urls}")
     # print(f"THESE ARE THE CHECKSUMS: {checksums}")
@@ -100,17 +98,14 @@ def extract_next_links(url: str, resp) -> list:
     # Extract all hyperlinks
     hyperlinks = []
     for a in soup.find_all('a', href=True):
-        # De-frag the url
-        # clean_url, fragment = urldefrag(a)
-
-        # Avoid the same exact url
-        # if clean_url != url:
         # Add only urls, not triggers
         hyperlink_url = a["href"]
-        parsed_url = urlparse(hyperlink_url)  # These two lines might be unnecessary
-        if parsed_url.scheme in {"http", "https"}:  # ^^
-            hyperlinks.append(remove_trailing_slash(hyperlink_url))
-            # print(f"Hyperlink: {hyperlink_url}")
+        # De-frag the url
+        defragmented_url, fragment = urldefrag(hyperlink_url)
+        parsed_url = urlparse(defragmented_url)
+        # Add only urls, not triggers
+        if parsed_url.scheme in {"http", "https"}:
+            hyperlinks.append(remove_trailing_slash(defragmented_url))
 
     return hyperlinks
 
@@ -123,8 +118,9 @@ def is_valid(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        # url must be in uci domain
+        # Check for correct hostname
         if (parsed.hostname is None
+                or parsed.hostname.endswith("cecs.uci.edu")
                 or not (parsed.hostname.endswith("ics.uci.edu")
                         or parsed.hostname.endswith("cs.uci.edu")
                         or parsed.hostname.endswith("informatics.uci.edu")
@@ -132,12 +128,11 @@ def is_valid(url: str) -> bool:
             return False
         # Skip ical download links
         query_params = parse_qs(parsed.query)
-        if any(key.lower() == "ical" for key in query_params):
+        if any("ical" in key.lower() for key in query_params):
             return False
         # No duplicate urls
         if remove_trailing_slash(url) in URLS:
             return False
-        URLS.add(remove_trailing_slash(url))
 
         return not re.match(
             r".*\.(css|js|bmp|gif|jpe?g|ico"
