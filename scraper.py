@@ -3,10 +3,11 @@ from urllib.parse import urlparse, urldefrag, urlunparse
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
+from tokenize_functions import tokenize, compute_word_frequencies, stopwords
 
 """
 1. checksum for detecting duplicate pages - JEREMY
-2. How many unique pages did you find? - RITHWIK
+2. How many unique pages did ou find? - RITHWIK
 3. What is the longest page in terms of the number of words? - RITHWIK
 4. What are the 50 most common words in the entire set of pages crawled under these domains ? - Assignment 1 - RITHWIK
 5. How many subdomains did you find in the ics.uci.edu domain ex: hpi.ics.uci.edu - RITHWIK
@@ -25,6 +26,14 @@ class Statistics:
             "words": 0,
             "url": ""
         }
+        self.num_ics_domain = 0
+        self.frequent_50_words = dict()
+
+    def get_num_unique_urls(self):
+        return len(self.unique_urls)
+
+    def get_unique_urls(self):
+        return self.unique_urls
 
     def update_longest_page(self, num_words, urls):
         if num_words > self.longest_page["words"]:
@@ -34,11 +43,31 @@ class Statistics:
     def update_unique_urls(self, url):
         self.unique_urls.add(url)
 
-    def get_num_unique_urls(self):
-        return len(self.unique_urls)
+    def check_and_update_ics_domain(self, url):
+        parsed = urlparse(url)
+        if parsed.hostname.endswith("ics.uci.edu"):
+            self.num_ics_domain += 1
 
-    def get_unique_urls(self):
-        return self.unique_urls
+    def update_frequent_words(self, tokens):
+        word_frequencies = compute_word_frequencies(tokens)
+        for key, value in word_frequencies.items():
+            if key not in stopwords:
+                self.frequent_50_words[key] = self.frequent_50_words.get(key, 0) + value
+
+    def get_top_50_frequent_words(self):
+        sorted_words = sorted(self.frequent_50_words, key=lambda k: self.frequent_50_words[k], reverse=True)
+        if len(sorted_words) >= 50:
+            return sorted_words[:50]
+        else:
+            return sorted_words
+
+    def get_final_statistics(self):
+        return {
+            "num_unique_urls": len(self.unique_urls),
+            "longest_page": self.longest_page["url"],
+            "num_ics_domain": self.num_ics_domain,
+            "top_50_words": self.get_top_50_frequent_words()
+        }
 
 
 # URL stats to answer all questions
@@ -101,6 +130,13 @@ def scraper(url: str, resp) -> list:
     soup = BeautifulSoup(resp.raw_response.content, "html.parser")
     text = soup.get_text()
     checksum = get_md5_checksum(text)
+    tokens = tokenize(text)
+
+    # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
+    url_stats.update_unique_urls(url)
+    url_stats.update_longest_page(tokens, url)
+    url_stats.update_frequent_words(tokens)
+    url_stats.check_and_update_ics_domain(url)
 
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
@@ -116,14 +152,6 @@ def scraper(url: str, resp) -> list:
         if is_valid(link) and not is_close_path(link):
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
-
-            # to get all unique urls
-            url_stats.update_unique_urls(link)
-
-            # to get longest 
-
-
-
 
     return valid_links
 
