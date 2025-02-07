@@ -108,8 +108,8 @@ def extract_next_links(url: str, resp) -> list:
         # if clean_url != url:
         # Add only urls, not triggers
         hyperlink_url = a["href"]
-        parsed_url = urlparse(hyperlink_url)
-        if parsed_url.scheme in {"http", "https"}:
+        parsed_url = urlparse(hyperlink_url)  # These two lines might be unnecessary
+        if parsed_url.scheme in {"http", "https"}:  # ^^
             hyperlinks.append(remove_trailing_slash(hyperlink_url))
             # print(f"Hyperlink: {hyperlink_url}")
 
