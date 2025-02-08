@@ -3,6 +3,7 @@ from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
+import atexit
 
 
 # Configure logging to write to a file
@@ -10,6 +11,13 @@ logging.basicConfig(filename="output.log", level=logging.INFO, format="%(asctime
 
 CHECKSUMS = set()
 URLS = set()
+
+
+def on_exit():
+    logging.info("PROGRAM END")
+
+
+atexit.register(on_exit)
 
 
 def remove_trailing_slash(url: str) -> str:
@@ -73,8 +81,8 @@ def scraper(url: str, resp) -> list:
             URLS.add(remove_trailing_slash(link))
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
-        else:
-            logging.info(f"Filtered link: {link}")
+        # else:
+        #     logging.info(f"Filtered link: {link}")
     # print(f"HERE ARE THE URLS: {urls}")
     # print(f"THESE ARE THE CHECKSUMS: {checksums}")
     return valid_links
