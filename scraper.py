@@ -1,5 +1,7 @@
 import re
 from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
+from urllib.robotparser import RobotFileParser
+from urllib.request import urlopen
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
@@ -14,18 +16,21 @@ URLS = set()
 
 
 def on_exit():
+    # Need to report stats here
     logging.info("PROGRAM END")
 
 
 atexit.register(on_exit)
 
 
+# Normalize urls
 def remove_trailing_slash(url: str) -> str:
     parsed = urlparse(url)
     new_parsed = (parsed.scheme, parsed.netloc, parsed.path.rstrip('/'), parsed.params, parsed.query, parsed.fragment)
     return urlunparse(new_parsed)
 
 
+# Calculate checksum
 def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
@@ -46,12 +51,30 @@ def is_close_path(url: str) -> bool:
     return False
 
 
+# Check robots.txt for permission to crawl link
+def can_crawl(url: str) -> bool:
+    parsed = urlparse(url)
+    robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    rp = RobotFileParser()
+    rp.set_url(robots_url)
+
+    try:
+        request = urlopen(robots_url, timeout=5)
+        if request.status == 200:
+            print(f"robots.txt found! {url}")
+            rp.read()
+        else:
+            print(f"robots.txt not found ({request.status}). Assuming crawling is allowed.")
+    except Exception as e:
+        print(f"Error fetching robots.txt: {e}. Assuming crawling is allowed.")
+
+    return rp.can_fetch("*", url)
+
+
 def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
-
-    # Need to check robots.txt
 
     # Redirects
     if resp.status == 300:
@@ -77,14 +100,10 @@ def scraper(url: str, resp) -> list:
     links = extract_next_links(url, resp)
     valid_links = []
     for link in links:
-        if is_valid(link) and not is_close_path(link):
+        if is_valid(link) and not is_close_path(link) and can_crawl(link):
             URLS.add(remove_trailing_slash(link))
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
-        # else:
-        #     logging.info(f"Filtered link: {link}")
-    # print(f"HERE ARE THE URLS: {urls}")
-    # print(f"THESE ARE THE CHECKSUMS: {checksums}")
     return valid_links
 
 
