@@ -157,7 +157,6 @@ def scraper(url: str, resp) -> list:
     valid_links = []
     for link in links:
         if is_valid(link) and not is_close_path(link):
-            URLS.add(remove_trailing_slash(link))
             url_stats.update_unique_urls(remove_trailing_slash(url))
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
