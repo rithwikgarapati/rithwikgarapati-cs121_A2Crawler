@@ -82,6 +82,7 @@ CHECKSUMS = set()
 
 
 def on_exit():
+    logging.info(url_stats.get_final_statistics())
     logging.info("PROGRAM END")
 
 
