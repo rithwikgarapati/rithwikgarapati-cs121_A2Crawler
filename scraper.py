@@ -35,10 +35,10 @@ class Statistics:
     def get_unique_urls(self):
         return self.unique_urls
 
-    def update_longest_page(self, num_words, urls):
+    def update_longest_page(self, num_words, url):
         if num_words > self.longest_page["words"]:
             self.longest_page["words"] = num_words
-            self.longest_page["urls"] = urls
+            self.longest_page["url"] = url
 
     def update_unique_urls(self, url):
         self.unique_urls.add(url)
@@ -102,6 +102,24 @@ def is_close_path(url: str) -> bool:
     return False
 
 
+# Don't scrape large files and files with low information value
+def low_information_or_large_file(resp, text, tokens) -> bool:
+    threshold = 200 * 1024  # 200KB is considered good page length
+    num_words = len(tokens)
+    unique_word_ratio = len(set(tokens)) / num_words if num_words > 0 else 0
+    text_to_html_ratio = len(text) / len(resp.raw_response.content) if len(resp.raw_response.content) > 0 else 0
+
+    # large page
+    if len(resp.raw_response.content) > threshold:
+        return True
+
+    # low information
+    if num_words < 50 or unique_word_ratio < 0.1 or text_to_html_ratio < 0.1:
+        return True
+
+    return False
+
+
 def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
         return list()
@@ -132,18 +150,24 @@ def scraper(url: str, resp) -> list:
     checksum = get_md5_checksum(text)
     tokens = tokenize(text)
 
-    # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
-    url_stats.update_unique_urls(url)
-    url_stats.update_longest_page(tokens, url)
-    url_stats.update_frequent_words(tokens)
-    url_stats.check_and_update_ics_domain(url)
-
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
         print(f"Checksum: {checksum}, URL: {url}")
         logging.info(f"Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
+
+    # Don't scrape large or small files, and files with low information value
+    if low_information_or_large_file(resp, text, tokens):
+        print(f"low info or large file: {url}")
+        logging.info(f"low info or large file: {url}")
+        return []
+
+    # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
+    url_stats.update_unique_urls(url)
+    url_stats.update_longest_page(len(tokens), url)
+    url_stats.update_frequent_words(tokens)
+    url_stats.check_and_update_ics_domain(url)
 
     links = extract_next_links(url, resp)
 
@@ -206,6 +230,7 @@ def is_valid(url: str) -> bool:
                         or parsed.hostname.endswith("informatics.uci.edu")
                         or parsed.hostname.endswith("stat.uci.edu"))):
             return False
+
         # No duplicate urls
         if remove_trailing_slash(url) in url_stats.get_unique_urls():
             return False
@@ -227,4 +252,6 @@ def is_valid(url: str) -> bool:
         raise
 
 
+# if __name__ == "__main__":
+#     frontier = ["https://ics.uci.edu/", "https://hs.ics.uci.edu/", "https://ics.uci.edu/defrag",  ]
 
