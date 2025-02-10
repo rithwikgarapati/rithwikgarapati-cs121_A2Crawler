@@ -1,7 +1,6 @@
 import re
 from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
 from urllib.robotparser import RobotFileParser
-from urllib.request import urlopen
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
@@ -55,19 +54,13 @@ def is_close_path(url: str) -> bool:
 def can_crawl(url: str) -> bool:
     parsed = urlparse(url)
     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+    print(f"Robots.txt: {robots_url}")
     rp = RobotFileParser()
     rp.set_url(robots_url)
 
-    try:
-        request = urlopen(robots_url, timeout=5)
-        if request.status == 200:
-            print(f"robots.txt found! {url}")
-            rp.read()
-        else:
-            print(f"robots.txt not found ({request.status}). Assuming crawling is allowed.")
-    except Exception as e:
-        print(f"Error fetching robots.txt: {e}. Assuming crawling is allowed.")
-
+    rp.read()
+    res = rp.can_fetch("*", url)
+    print(f"Result: {res}, url: {url}")
     return rp.can_fetch("*", url)
 
 
