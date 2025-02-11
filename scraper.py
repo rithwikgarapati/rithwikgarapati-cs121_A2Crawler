@@ -16,6 +16,9 @@ from tokenize_functions import tokenize, compute_word_frequencies, stopwords
 8. Detect and avoid crawling very large files, especially if they have low information value (avoid pages that are
     too long and pages too short - threshold) - RITHWIK
 9. You should write simple automatic trap detection systems based on repeated URL patterns and/or (ideally) webpage content similarity repetition over a certain amount of chained pages (the threshold definition is up to you!).
+10. Finish relative URLs - RITHWIK.
+11. redirects - 300, follow the redirect and index that
+
 """
 
 
@@ -104,17 +107,21 @@ def is_close_path(url: str) -> bool:
 
 # Don't scrape large files and files with low information value
 def low_information_or_large_file(resp, text, tokens) -> bool:
-    threshold = 200 * 1024  # 200KB is considered good page length
+    threshold = 1 * 1024 * 1024  # 1MB page is big
     num_words = len(tokens)
     unique_word_ratio = len(set(tokens)) / num_words if num_words > 0 else 0
-    text_to_html_ratio = len(text) / len(resp.raw_response.content) if len(resp.raw_response.content) > 0 else 0
+    print(f"filesize:{len(resp.raw_response.content)}")
+
+    print(f"{resp.url}, {unique_word_ratio}")
 
     # large page
     if len(resp.raw_response.content) > threshold:
+        print(f"here: threshold{len(resp.raw_response.content)}")
         return True
 
     # low information
-    if num_words < 50 or unique_word_ratio < 0.1 or text_to_html_ratio < 0.1:
+    if num_words < 50 or unique_word_ratio < 0.1:
+        print(f"second condition")
         return True
 
     return False
@@ -169,13 +176,17 @@ def scraper(url: str, resp) -> list:
     url_stats.update_frequent_words(tokens)
     url_stats.check_and_update_ics_domain(url)
 
+    print(f"url:{url}")
+
     links = extract_next_links(url, resp)
 
     valid_links = []
     for link in links:
+        #print(f"link:{link}")
         if is_valid(link) and not is_close_path(link):
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
+
 
     return valid_links
 
@@ -252,6 +263,4 @@ def is_valid(url: str) -> bool:
         raise
 
 
-# if __name__ == "__main__":
-#     frontier = ["https://ics.uci.edu/", "https://hs.ics.uci.edu/", "https://ics.uci.edu/defrag",  ]
 
