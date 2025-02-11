@@ -18,6 +18,9 @@ from tokenize_functions import tokenize, compute_word_frequencies, stopwords
 8. Detect and avoid crawling very large files, especially if they have low information value (avoid pages that are
     too long and pages too short - threshold) - RITHWIK
 9. You should write simple automatic trap detection systems based on repeated URL patterns and/or (ideally) webpage content similarity repetition over a certain amount of chained pages (the threshold definition is up to you!).
+10. Finish relative URLs - RITHWIK.
+11. redirects - 300, follow the redirect and index that
+
 """
 
 
@@ -37,10 +40,10 @@ class Statistics:
     def get_unique_urls(self):
         return self.unique_urls
 
-    def update_longest_page(self, num_words, urls):
+    def update_longest_page(self, num_words, url):
         if num_words > self.longest_page["words"]:
             self.longest_page["words"] = num_words
-            self.longest_page["urls"] = urls
+            self.longest_page["url"] = url
 
     def update_unique_urls(self, url):
         self.unique_urls.add(url)
@@ -117,6 +120,28 @@ def is_close_path(url: str) -> bool:
     return False
 
 
+# Don't scrape large files and files with low information value
+def low_information_or_large_file(resp, text, tokens) -> bool:
+    threshold = 1 * 1024 * 1024  # 1MB page is big
+    num_words = len(tokens)
+    unique_word_ratio = len(set(tokens)) / num_words if num_words > 0 else 0
+    print(f"filesize:{len(resp.raw_response.content)}")
+
+    print(f"{resp.url}, {unique_word_ratio}")
+
+    # large page
+    if len(resp.raw_response.content) > threshold:
+        print(f"here: threshold{len(resp.raw_response.content)}")
+        return True
+
+    # low information
+    if num_words < 50 or unique_word_ratio < 0.1:
+        print(f"second condition")
+        return True
+
+    return False
+
+
 def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
@@ -140,26 +165,36 @@ def scraper(url: str, resp) -> list:
     checksum = get_md5_checksum(text)
     tokens = tokenize(text)
 
-    # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
-    url_stats.update_unique_urls(url)
-    url_stats.update_longest_page(tokens, url)
-    url_stats.update_frequent_words(tokens)
-    url_stats.check_and_update_ics_domain(url)
-
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
         logging.info(f"DUPLICATE PAGE, Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
 
+    # Don't scrape large or small files, and files with low information value
+    if low_information_or_large_file(resp, text, tokens):
+        print(f"low info or large file: {url}")
+        logging.info(f"low info or large file: {url}")
+        return []
+
+    # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
+    url_stats.update_unique_urls(url)
+    url_stats.update_longest_page(len(tokens), url)
+    url_stats.update_frequent_words(tokens)
+    url_stats.check_and_update_ics_domain(url)
+
+    print(f"url:{url}")
+
     links = extract_next_links(url, resp)
 
     valid_links = []
     for link in links:
+        #print(f"link:{link}")
         if is_valid(link) and not is_close_path(link):
             url_stats.update_unique_urls(remove_trailing_slash(url))
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
+
     return valid_links
 
 
@@ -215,10 +250,12 @@ def is_valid(url: str) -> bool:
                         or parsed.hostname.endswith("informatics.uci.edu")
                         or parsed.hostname.endswith("stat.uci.edu"))):
             return False
+
         # Skip ical download links
         query_params = parse_qs(parsed.query)
         if any("ical" in key.lower() for key in query_params):
             return False
+
         # No duplicate urls
         if remove_trailing_slash(url) in url_stats.get_unique_urls():
             return False
