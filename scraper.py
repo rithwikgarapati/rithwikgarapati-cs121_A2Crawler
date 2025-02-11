@@ -1,8 +1,10 @@
 import re
-from urllib.parse import urlparse, urldefrag, urlunparse
+from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
+
+import atexit
 from tokenize_functions import tokenize, compute_word_frequencies, stopwords
 
 """
@@ -82,6 +84,14 @@ logging.basicConfig(filename="output.log", level=logging.INFO, format="%(asctime
 CHECKSUMS = set()
 
 
+def on_exit():
+    logging.info(url_stats.get_final_statistics())
+    logging.info("PROGRAM END")
+
+
+atexit.register(on_exit)
+
+
 def remove_trailing_slash(url: str) -> str:
     parsed = urlparse(url)
     new_parsed = (parsed.scheme, parsed.netloc, parsed.path.rstrip('/'), parsed.params, parsed.query, parsed.fragment)
@@ -92,10 +102,15 @@ def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
 
+# https://wics.ics.uci.edu/events/category/social-gathering/2020-09/
+# Also need to skip ical
+# https://ics.uci.edu/event/state-of-the-informatics-department?ical=1
+
 # To detect loops in calenders.
 def is_close_path(url: str) -> bool:
     date_pattern = re.compile(r'(\b\d{4}-\d{2}-\d{2}\b)')
-    match = date_pattern.search(url)
+    date_pattern2 = re.compile(r'(\b\d{4}-\d{2}\b)')
+    match = date_pattern.search(url) or date_pattern2.search(url)
     if match:
         base_url = url.replace(match.group(0), "DATE")  # Normalize by replacing the date
         if base_url in url_stats.get_unique_urls():
@@ -129,26 +144,19 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
 
 def scraper(url: str, resp) -> list:
     if resp is None or resp.raw_response is None:
+        logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
 
     # Need to check robots.txt
 
-    # Need to check for close path
-    # if is_close_path(url):
-    #     logging.info(f"PATH TOO SIMILAR: {url}")
-    #     return list()
-
     # Redirects
     if resp.status == 300:
-        print(f"REDIRECT: {url}")
-        logging.info(f"REDIRECT: {url}")
+        logging.info(f"REDIRECT, Status: {resp.status} URL: {url}")
         return list()
 
     # Errors
     if resp.status != 200:
-        return list()
-
-    if resp.raw_response is None:
+        logging.info(f"ERROR, Status: {resp.status} URL:{url}")
         return list()
 
     # Parse html, get text, and calculate checksum
@@ -159,8 +167,7 @@ def scraper(url: str, resp) -> list:
 
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
-        print(f"Checksum: {checksum}, URL: {url}")
-        logging.info(f"Checksum: {checksum}, URL: {url}")
+        logging.info(f"DUPLICATE PAGE, Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
 
@@ -184,9 +191,9 @@ def scraper(url: str, resp) -> list:
     for link in links:
         #print(f"link:{link}")
         if is_valid(link) and not is_close_path(link):
+            url_stats.update_unique_urls(remove_trailing_slash(url))
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
-
 
     return valid_links
 
@@ -211,15 +218,14 @@ def extract_next_links(url: str, resp) -> list:
     # Extract all hyperlinks
     hyperlinks = []
     for a in soup.find_all('a', href=True):
-        
+        # Add only urls, not triggers
         hyperlink_url = a["href"]
         # De-frag the url
         defragmented_url, fragment = urldefrag(hyperlink_url)
-        parsed_url = urlparse(hyperlink_url)
+        parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
             hyperlinks.append(remove_trailing_slash(defragmented_url))
-            # print(f"Hyperlink: {hyperlink_url}")
 
     return hyperlinks
 
@@ -233,19 +239,26 @@ def is_valid(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
+        # Check for correct hostname
 
         # url must be in uci domain
         if (parsed.hostname is None
+                or (parsed.hostname.endswith("cecs.uci.edu")
+                    or parsed.hostname.endswith("eecs.uci.edu"))
                 or not (parsed.hostname.endswith("ics.uci.edu")
                         or parsed.hostname.endswith("cs.uci.edu")
                         or parsed.hostname.endswith("informatics.uci.edu")
                         or parsed.hostname.endswith("stat.uci.edu"))):
             return False
 
+        # Skip ical download links
+        query_params = parse_qs(parsed.query)
+        if any("ical" in key.lower() for key in query_params):
+            return False
+
         # No duplicate urls
         if remove_trailing_slash(url) in url_stats.get_unique_urls():
             return False
-        url_stats.update_unique_urls(remove_trailing_slash(url))
 
         return not re.match(
 
@@ -256,7 +269,7 @@ def is_valid(url: str) -> bool:
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics)$", parsed.path.lower())
 
     except TypeError:
         print("TypeError for ", url)
