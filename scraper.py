@@ -40,7 +40,7 @@ class Statistics:
     def update_longest_page(self, num_words, urls):
         if num_words > self.longest_page["words"]:
             self.longest_page["words"] = num_words
-            self.longest_page["urls"] = urls
+            self.longest_page["url"] = urls
 
     def update_unique_urls(self, url):
         self.unique_urls.add(url)
@@ -125,9 +125,21 @@ def scraper(url: str, resp) -> list:
     # Need to check robots.txt
 
     # Redirects
-    if resp.status == 300:
-        logging.info(f"REDIRECT, Status: {resp.status} URL: {url}")
-        return list()
+    if 300 <= resp.status <= 399:
+        logging.info(f"REDIRECT, Status: {resp.status}, URL: {url}")
+        new_url = resp.raw_response.headers.get("Location")
+        if not new_url:
+            logging.info(f"REDIRECT WITHOUT LOCATION HEADER, Status: {resp.status}, URL: {url}")
+            return list()
+
+        logging.info(f"REDIRECT DETECTED, Status: {resp.status}, Redirecting {url} → {new_url}")
+
+        # Fetch the new URL's content
+        redirected_resp = requests.get(new_url, allow_redirects=True)  # Follow redirects automatically
+
+        # Recursively call scraper with new response
+        return scraper(new_url, type("Response", (object,), {"status": redirected_resp.status_code, "raw_response": redirected_resp}))
+
 
     # Errors
     if resp.status != 200:
@@ -140,24 +152,24 @@ def scraper(url: str, resp) -> list:
     checksum = get_md5_checksum(text)
     tokens = tokenize(text)
 
-    # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
-    url_stats.update_unique_urls(url)
-    url_stats.update_longest_page(tokens, url)
-    url_stats.update_frequent_words(tokens)
-    url_stats.check_and_update_ics_domain(url)
-
     # Don't scrape pages with duplicate checksum
     if checksum in CHECKSUMS:
         logging.info(f"DUPLICATE PAGE, Checksum: {checksum}, URL: {url}")
         return list()
     CHECKSUMS.add(checksum)
 
+     # COMPUTING STATISTICS TO ANSWER THE QUESTIONS
+    url_stats.update_unique_urls(url)
+    url_stats.update_longest_page(len(tokens), url)
+    url_stats.update_frequent_words(tokens)
+    url_stats.check_and_update_ics_domain(url)
+
     links = extract_next_links(url, resp)
 
     valid_links = []
     for link in links:
-        if is_valid(link) and not is_close_path(link):
-            url_stats.update_unique_urls(remove_trailing_slash(url))
+        if is_valid(link) and not is_close_path(link) and link not in url_stats.get_unique_urls():
+            url_stats.update_unique_urls(link)
             valid_links.append(link)
             logging.info(f"Valid link: {link}")
     return valid_links
@@ -232,7 +244,7 @@ def is_valid(url: str) -> bool:
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx)$", parsed.path.lower())
 
     except TypeError:
         print("TypeError for ", url)
