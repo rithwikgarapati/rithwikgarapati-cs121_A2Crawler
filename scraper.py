@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup  # Parse HTML
 
 import atexit
 from tokenize_functions import tokenize, compute_word_frequencies, stopwords
+from collections import defaultdict
 
 """
 1. checksum for detecting duplicate pages - JEREMY
@@ -31,7 +32,7 @@ class Statistics:
             "words": 0,
             "url": ""
         }
-        self.num_ics_domain = 0
+        self.ics_subdomains = defaultdict(int)
         self.frequent_50_words = dict()
 
     def get_num_unique_urls(self):
@@ -50,8 +51,8 @@ class Statistics:
 
     def check_and_update_ics_domain(self, url):
         parsed = urlparse(url)
-        if parsed.hostname.endswith("ics.uci.edu"):
-            self.num_ics_domain += 1
+        if parsed.netloc.endswith("ics.uci.edu"):
+            self.ics_subdomains[parsed.netloc] += 1
 
     def update_frequent_words(self, tokens):
         word_frequencies = compute_word_frequencies(tokens)
@@ -70,7 +71,7 @@ class Statistics:
         return {
             "num_unique_urls": len(self.unique_urls),
             "longest_page": self.longest_page["url"],
-            "num_ics_domain": self.num_ics_domain,
+            "ics_subdomain_count": sorted(self.ics_subdomains.items()),
             "top_50_words": self.get_top_50_frequent_words()
         }
 
@@ -126,7 +127,6 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
     num_words = len(tokens)
     unique_word_ratio = len(set(tokens)) / num_words if num_words > 0 else 0
     print(f"filesize:{len(resp.raw_response.content)}")
-
     print(f"{resp.url}, {unique_word_ratio}")
 
     # large page
@@ -143,6 +143,9 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
 
 
 def scraper(url: str, resp) -> list:
+
+    logging.info(f"Scraped URL: {url}")
+
     if resp is None or resp.raw_response is None:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
@@ -193,7 +196,7 @@ def scraper(url: str, resp) -> list:
         if is_valid(link) and not is_close_path(link):
             url_stats.update_unique_urls(remove_trailing_slash(url))
             valid_links.append(link)
-            logging.info(f"Valid link: {link}")
+            # logging.info(f"Valid link: {link}")
 
     return valid_links
 

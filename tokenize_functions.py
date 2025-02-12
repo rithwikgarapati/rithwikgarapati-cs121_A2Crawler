@@ -92,7 +92,7 @@ def tokenize(content: str):
 
     pattern = r'[a-zA-Z0-9]+'
     tokens = re.findall(pattern, content, flags=re.ASCII)
-    tokens = [token.lower() for token in tokens]
+    tokens = [token.lower() for token in tokens if len(token) > 1]
     return tokens
 
 
