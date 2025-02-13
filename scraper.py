@@ -144,7 +144,7 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
 
 def scraper(url: str, resp) -> list:
 
-    logging.info(f"Scraped URL: {url}")
+    # logging.info(f"Scraped URL: {url}")
 
     if resp is None or resp.raw_response is None:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
