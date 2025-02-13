@@ -1,5 +1,5 @@
 import re
-from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
+from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs, urljoin
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
@@ -230,10 +230,10 @@ def extract_next_links(url: str, resp) -> list:
     # Extract all hyperlinks
     hyperlinks = []
     for a in soup.find_all('a', href=True):
-        # Add only urls, not triggers
         hyperlink_url = a["href"]
+        absolute_url = urljoin(resp.url, hyperlink_url)
         # De-frag the url
-        defragmented_url, fragment = urldefrag(hyperlink_url)
+        defragmented_url, fragment = urldefrag(absolute_url)
         parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
