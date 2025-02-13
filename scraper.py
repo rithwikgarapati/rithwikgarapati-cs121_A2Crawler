@@ -122,27 +122,25 @@ def scraper(url: str, resp) -> list:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
 
-    # Need to check robots.txt
-
     # Redirects
     if 300 <= resp.status <= 399:
         logging.info(f"REDIRECT, Status: {resp.status}, URL: {url}")
-        new_url = resp.raw_response.headers.get("Location")
-        if not new_url:
-            logging.info(f"REDIRECT WITHOUT LOCATION HEADER, Status: {resp.status}, URL: {url}")
-            return list()
+        # new_url = resp.raw_response.headers.get("Location")
+        # if not new_url:
+        #     logging.info(f"REDIRECT WITHOUT LOCATION HEADER, Status: {resp.status}, URL: {url}")
+        #     return list()
 
-        logging.info(f"REDIRECT DETECTED, Status: {resp.status}, Redirecting {url} → {new_url}")
+        # logging.info(f"REDIRECT DETECTED, Status: {resp.status}, Redirecting {url} → {new_url}")
 
-        # Fetch the new URL's content
-        redirected_resp = requests.get(new_url, allow_redirects=True)  # Follow redirects automatically
+        # # Fetch the new URL's content
+        # redirected_resp = requests.get(new_url, allow_redirects=True)  # Follow redirects automatically
 
-        # Recursively call scraper with new response
-        return scraper(new_url, type("Response", (object,), {"status": redirected_resp.status_code, "raw_response": redirected_resp}))
+        # # Recursively call scraper with new response
+        # return scraper(new_url, type("Response", (object,), {"status": redirected_resp.status_code, "raw_response": redirected_resp}))
 
 
     # Errors
-    if resp.status != 200:
+    if not 200 <= resp.status <= 299:
         logging.info(f"ERROR, Status: {resp.status} URL:{url}")
         return list()
 
@@ -249,6 +247,4 @@ def is_valid(url: str) -> bool:
     except TypeError:
         print("TypeError for ", url)
         raise
-
-
 
