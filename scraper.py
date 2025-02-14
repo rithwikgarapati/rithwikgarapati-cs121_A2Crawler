@@ -150,6 +150,10 @@ def scraper(url: str, resp) -> list:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
 
+    if not is_valid(url):
+        logging.info(f"SHITTY URL ESCAPED {url}")
+        return list()
+
     # Redirects
     if 300 <= resp.status <= 399:
         logging.info(f"REDIRECT, Status: {resp.status}, URL: {url}")
@@ -244,7 +248,7 @@ def extract_next_links(url: str, resp) -> list:
         parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
-            if absolute_url != hyperlink_url:
+            # if absolute_url != hyperlink_url:
                 # logging.info(f"VALID RELATIVE URL FOUND: {hyperlink_url}: {absolute_url}")
             hyperlinks.append(remove_trailing_slash(defragmented_url))
 
@@ -260,7 +264,22 @@ def is_valid(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        # Check for correct hostname
+        
+        # long url traps
+        if len(urlunparse(parsed)) > 200:
+            return False
+
+        # # anchor traps
+        # if "#" in parsed.geturl():
+        #     return False
+
+        # repeating directories
+        if re.match("^.*?(/.+?/).*?\1.*$|^.*?/(.+?/)\2.*$", parsed.path):
+            return False
+
+        # extra directories
+        if re.match("^.*(/misc|/sites|/all|/themes|/modules|/profiles|/css|/field|/node|/theme){3}.*$", parsed.path):
+            return False
 
         # url must be in uci domain
         if (parsed.hostname is None
@@ -279,6 +298,11 @@ def is_valid(url: str) -> bool:
 
         # No duplicate urls
         if remove_trailing_slash(url) in url_stats.get_unique_urls():
+            return False
+
+        # Wiki trap https://wiki.ics.uci.edu/doku.php/announce:fall-2020?tab_details=history&do=media&tab_files=search&image=virtual_environments%3Ajupyterhub%3Ajhub-filecopy.png&ns=group
+        pattern = r"(do=media|tab_files=(files|search|upload)|tab_details=(history|view)|image=)"
+        if re.search(pattern, urlunparse(pattern)):
             return False
 
         return not re.match(
