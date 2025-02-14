@@ -1,6 +1,5 @@
 import re
-from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs
-from urllib.robotparser import RobotFileParser
+from urllib.parse import urlparse, urldefrag, urlunparse, parse_qs, urljoin
 import hashlib  # Checksum
 import logging
 from bs4 import BeautifulSoup  # Parse HTML
@@ -167,6 +166,10 @@ def scraper(url: str, resp) -> list:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
 
+    if not is_valid(url):
+        logging.info(f"SHITTY URL ESCAPED {url}")
+        return list()
+
     # Redirects
     if 300 <= resp.status <= 399:
         logging.info(f"REDIRECT, Status: {resp.status}, URL: {url}")
@@ -248,13 +251,22 @@ def extract_next_links(url: str, resp) -> list:
     # Extract all hyperlinks
     hyperlinks = []
     for a in soup.find_all('a', href=True):
-        # Add only urls, not triggers
         hyperlink_url = a["href"]
+        if hyperlink_url == "#":
+            # logging.info(f"PLACEHOLDER FOUND {hyperlink_url}")
+            continue
+
+        if "swiki" in hyperlink_url or "evoke" in hyperlink_url or "archive" in hyperlink_url:
+            hyperlink_url = hyperlink_url.split('?')[0]
+
+        absolute_url = urljoin(resp.url, hyperlink_url)
         # De-frag the url
-        defragmented_url, fragment = urldefrag(hyperlink_url)
+        defragmented_url, fragment = urldefrag(absolute_url)
         parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
+            # if absolute_url != hyperlink_url:
+                # logging.info(f"VALID RELATIVE URL FOUND: {hyperlink_url}: {absolute_url}")
             hyperlinks.append(remove_trailing_slash(defragmented_url))
 
     return hyperlinks
@@ -269,7 +281,22 @@ def is_valid(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        # Check for correct hostname
+        
+        # long url traps
+        if len(urlunparse(parsed)) > 200:
+            return False
+
+        # # anchor traps
+        # if "#" in parsed.geturl():
+        #     return False
+
+        # repeating directories
+        if re.match("^.*?(/.+?/).*?\1.*$|^.*?/(.+?/)\2.*$", parsed.path):
+            return False
+
+        # extra directories
+        if re.match("^.*(/misc|/sites|/all|/themes|/modules|/profiles|/css|/field|/node|/theme){3}.*$", parsed.path):
+            return False
 
         # url must be in uci domain
         if (parsed.hostname is None
@@ -286,9 +313,14 @@ def is_valid(url: str) -> bool:
         if any("ical" in key.lower() for key in query_params):
             return False
 
-        # No duplicate urls
-        if remove_trailing_slash(url) in url_stats.get_unique_urls():
+        # Wiki trap https://wiki.ics.uci.edu/doku.php/announce:fall-2020?tab_details=history&do=media&tab_files=search&image=virtual_environments%3Ajupyterhub%3Ajhub-filecopy.png&ns=group
+        pattern = r"(do=media|tab_files=(files|search|upload)|tab_details=(history|view)|image=)"
+        if re.search(pattern, url):
             return False
+
+        # No duplicate urls
+        # if remove_trailing_slash(url) in url_stats.get_unique_urls():
+        #     return False
 
         return not re.match(
 
@@ -299,7 +331,7 @@ def is_valid(url: str) -> bool:
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx|mol)$", parsed.path.lower())
 
     except TypeError:
         print("TypeError for ", url)
