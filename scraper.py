@@ -175,19 +175,6 @@ def scraper(url: str, resp) -> list:
     # Redirects
     if 300 <= resp.status <= 399:
         logging.info(f"REDIRECT, Status: {resp.status}, URL: {url}")
-        # new_url = resp.raw_response.headers.get("Location")
-        # if not new_url:
-        #     logging.info(f"REDIRECT WITHOUT LOCATION HEADER, Status: {resp.status}, URL: {url}")
-        #     return list()
-
-        # logging.info(f"REDIRECT DETECTED, Status: {resp.status}, Redirecting {url} → {new_url}")
-
-        # # Fetch the new URL's content
-        # redirected_resp = requests.get(new_url, allow_redirects=True)  # Follow redirects automatically
-
-        # # Recursively call scraper with new response
-        # return scraper(new_url, type("Response", (object,), {"status": redirected_resp.status_code, "raw_response": redirected_resp}))
-
 
     # Errors
     if not 200 <= resp.status <= 299:
@@ -267,8 +254,6 @@ def extract_next_links(url: str, resp) -> list:
         parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
-            # if absolute_url != hyperlink_url:
-                # logging.info(f"VALID RELATIVE URL FOUND: {hyperlink_url}: {absolute_url}")
             hyperlinks.append(remove_trailing_slash(defragmented_url))
 
     return hyperlinks
@@ -288,9 +273,16 @@ def is_valid(url: str) -> bool:
         if len(urlunparse(parsed)) > 200:
             return False
 
-        # # anchor traps
-        # if "#" in parsed.geturl():
-        #     return False
+
+        # General regex pattern to avoid unwanted URLs
+        AVOID_PATTERNS = [
+            r"idx=[^&]+",  # Avoids any URL containing `idx=<anything>`
+            r"do=edit",    # Avoids edit pages
+            r"do=diff",    # Avoids diff/compare pages
+            r"\?rev=",     # Avoids revision-specific pages
+        ]
+        if any(re.search(pattern, url) for pattern in AVOID_PATTERNS):
+            return False
 
         # repeating directories
         if re.match("^.*?(/.+?/).*?\1.*$|^.*?/(.+?/)\2.*$", parsed.path):
