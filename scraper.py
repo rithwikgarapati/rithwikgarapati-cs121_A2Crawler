@@ -166,9 +166,11 @@ def scraper(url: str, resp) -> list:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
 
-    if not is_valid(url):
-        logging.info(f"SHITTY URL ESCAPED {url}")
-        return list()
+    # https://ics.uci.edu/academics/undergraduate-academic-advising/majorminor_restrictions_chart
+    content_type = resp.raw_response.headers.get('Content-Type', '').lower()
+    if not content_type.startswith("text/html"):
+        logging.info(f"Skipping non-webpage file: {content_type} -> {url}")
+        return  list()
 
     # Redirects
     if 300 <= resp.status <= 399:
@@ -315,6 +317,10 @@ def is_valid(url: str) -> bool:
 
         # Wiki trap https://wiki.ics.uci.edu/doku.php/announce:fall-2020?tab_details=history&do=media&tab_files=search&image=virtual_environments%3Ajupyterhub%3Ajhub-filecopy.png&ns=group
         pattern = r"(do=media|tab_files=(files|search|upload)|tab_details=(history|view)|image=)"
+        if re.search(pattern, url):
+            return False
+
+        pattern = r".*(\?do=edit|\?do=diff|\?rev=|\?rev2%5B).*"
         if re.search(pattern, url):
             return False
 
