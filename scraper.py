@@ -126,17 +126,17 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
     threshold = 1 * 1024 * 1024  # 1MB page is big
     num_words = len(tokens)
     unique_word_ratio = len(set(tokens)) / num_words if num_words > 0 else 0
-    print(f"filesize:{len(resp.raw_response.content)}")
-    print(f"{resp.url}, {unique_word_ratio}")
+    #print(f"filesize:{len(resp.raw_response.content)}")
+    #print(f"{resp.url}, {unique_word_ratio}")
 
     # large page
     if len(resp.raw_response.content) > threshold:
-        print(f"here: threshold{len(resp.raw_response.content)}")
+        # print(f"here: threshold{len(resp.raw_response.content)}")
         return True
 
     # low information
     if num_words < 50 or unique_word_ratio < 0.1:
-        print(f"second condition")
+        # print(f"second condition")
         return True
 
     return False
@@ -271,6 +271,24 @@ def is_valid(url: str) -> bool:
         # No duplicate urls
         if remove_trailing_slash(url) in url_stats.get_unique_urls():
             return False
+
+        # long url traps and anchor tags
+        if len(url) > 200 or '#' in url:
+            return False
+
+        # no repeated directiories
+        if re.match(r"^.*?(/.+?/).*?\1.*$|^.*?/(.+?/)\2.*$", parsed.path):
+            return False
+
+        # no pictures
+        if re.match(r".*\.(jpg|png|pfd|ps|ps\.z)", parsed.query.lower()):
+            return False
+
+        # extra directories in url - for wikis etc.
+        if re.match("^.*(/misc|/sites|/all|/themes|/modules|/profiles|/css|/field|/node|/theme){3}.*$", parsed.path):
+            return False
+
+        # avoid calenders - this is the regex for that: ^.*calendar.*$ (not sure if we wanna include this)
 
         return not re.match(
 
