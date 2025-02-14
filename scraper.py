@@ -296,14 +296,14 @@ def is_valid(url: str) -> bool:
         if any("ical" in key.lower() for key in query_params):
             return False
 
-        # No duplicate urls
-        if remove_trailing_slash(url) in url_stats.get_unique_urls():
-            return False
-
         # Wiki trap https://wiki.ics.uci.edu/doku.php/announce:fall-2020?tab_details=history&do=media&tab_files=search&image=virtual_environments%3Ajupyterhub%3Ajhub-filecopy.png&ns=group
         pattern = r"(do=media|tab_files=(files|search|upload)|tab_details=(history|view)|image=)"
-        if re.search(pattern, urlunparse(pattern)):
+        if re.search(pattern, url):
             return False
+
+        # No duplicate urls
+        # if remove_trailing_slash(url) in url_stats.get_unique_urls():
+        #     return False
 
         return not re.match(
 
@@ -314,7 +314,7 @@ def is_valid(url: str) -> bool:
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx|mol)$", parsed.path.lower())
 
     except TypeError:
         print("TypeError for ", url)
