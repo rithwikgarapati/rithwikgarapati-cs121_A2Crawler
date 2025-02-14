@@ -93,12 +93,14 @@ def on_exit():
 atexit.register(on_exit)
 
 
+# Normalize urls
 def remove_trailing_slash(url: str) -> str:
     parsed = urlparse(url)
     new_parsed = (parsed.scheme, parsed.netloc, parsed.path.rstrip('/'), parsed.params, parsed.query, parsed.fragment)
     return urlunparse(new_parsed)
 
 
+# Calculate checksum
 def get_md5_checksum(text: str):
     return hashlib.md5(text.encode()).hexdigest()
 
@@ -142,13 +144,33 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
     return False
 
 
+# # Check robots.txt for permission to crawl link
+# def can_crawl(url: str) -> bool:
+#     parsed = urlparse(url)
+#     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
+#     print(f"Robots.txt: {robots_url}")
+#     rp = RobotFileParser()
+#     rp.set_url(robots_url)
+
+#     rp.read()
+#     res = rp.can_fetch("*", url)
+#     print(f"Result: {res}, url: {url}")
+#     return rp.can_fetch("*", url)
+
+
 def scraper(url: str, resp) -> list:
 
-    logging.info(f"Scraped URL: {url}")
+    # logging.info(f"Scraped URL: {url}")
 
     if resp is None or resp.raw_response is None:
         logging.info(f"RESPONSE IS NONE, URL: {url}")
         return list()
+
+    # https://ics.uci.edu/academics/undergraduate-academic-advising/majorminor_restrictions_chart
+    content_type = resp.raw_response.headers.get('Content-Type', '').lower()
+    if not content_type.startswith("text/html"):
+        logging.info(f"Skipping non-webpage file: {content_type} -> {url}")
+        return  list()
 
     # Redirects
     if 300 <= resp.status <= 399:
@@ -202,6 +224,7 @@ def scraper(url: str, resp) -> list:
 
     valid_links = []
     for link in links:
+
         if is_valid(link) and not is_close_path(link) and link not in url_stats.get_unique_urls():
             url_stats.update_unique_urls(link)
             valid_links.append(link)
@@ -231,12 +254,21 @@ def extract_next_links(url: str, resp) -> list:
     hyperlinks = []
     for a in soup.find_all('a', href=True):
         hyperlink_url = a["href"]
+        if hyperlink_url == "#":
+            # logging.info(f"PLACEHOLDER FOUND {hyperlink_url}")
+            continue
+
+        if "swiki" in hyperlink_url or "evoke" in hyperlink_url or "archive" in hyperlink_url:
+            hyperlink_url = hyperlink_url.split('?')[0]
+
         absolute_url = urljoin(resp.url, hyperlink_url)
         # De-frag the url
         defragmented_url, fragment = urldefrag(absolute_url)
         parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
+            # if absolute_url != hyperlink_url:
+                # logging.info(f"VALID RELATIVE URL FOUND: {hyperlink_url}: {absolute_url}")
             hyperlinks.append(remove_trailing_slash(defragmented_url))
 
     return hyperlinks
@@ -251,7 +283,22 @@ def is_valid(url: str) -> bool:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
             return False
-        # Check for correct hostname
+        
+        # long url traps
+        if len(urlunparse(parsed)) > 200:
+            return False
+
+        # # anchor traps
+        # if "#" in parsed.geturl():
+        #     return False
+
+        # repeating directories
+        if re.match("^.*?(/.+?/).*?\1.*$|^.*?/(.+?/)\2.*$", parsed.path):
+            return False
+
+        # extra directories
+        if re.match("^.*(/misc|/sites|/all|/themes|/modules|/profiles|/css|/field|/node|/theme){3}.*$", parsed.path):
+            return False
 
         # url must be in uci domain
         if (parsed.hostname is None
@@ -268,10 +315,14 @@ def is_valid(url: str) -> bool:
         if any("ical" in key.lower() for key in query_params):
             return False
 
-        # No duplicate urls
-        if remove_trailing_slash(url) in url_stats.get_unique_urls():
+        # Wiki trap https://wiki.ics.uci.edu/doku.php/announce:fall-2020?tab_details=history&do=media&tab_files=search&image=virtual_environments%3Ajupyterhub%3Ajhub-filecopy.png&ns=group
+        pattern = r"(do=media|tab_files=(files|search|upload)|tab_details=(history|view)|image=)"
+        if re.search(pattern, url):
             return False
 
+        pattern = r".*(\?do=edit|\?do=diff|\?rev=|\?rev2%5B).*"
+        if re.search(pattern, url):
+            return False
         # long url traps and anchor tags
         if len(url) > 200 or '#' in url:
             return False
@@ -299,7 +350,7 @@ def is_valid(url: str) -> bool:
             + r"|data|dat|exe|bz2|tar|msi|bin|7z|psd|dmg|iso"
             + r"|epub|dll|cnf|tgz|sha1"
             + r"|thmx|mso|arff|rtf|jar|csv"
-            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx)$", parsed.path.lower())
+            + r"|rm|smil|wmv|swf|wma|zip|rar|gz|ics|ppsx|mol)$", parsed.path.lower())
 
     except TypeError:
         print("TypeError for ", url)
