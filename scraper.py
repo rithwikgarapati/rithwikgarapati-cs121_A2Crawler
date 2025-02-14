@@ -231,12 +231,21 @@ def extract_next_links(url: str, resp) -> list:
     hyperlinks = []
     for a in soup.find_all('a', href=True):
         hyperlink_url = a["href"]
+        if hyperlink_url == "#":
+            # logging.info(f"PLACEHOLDER FOUND {hyperlink_url}")
+            continue
+
+        if "swiki" in hyperlink_url or "evoke" in hyperlink_url or "archive" in hyperlink_url:
+            hyperlink_url = hyperlink_url.split('?')[0]
+
         absolute_url = urljoin(resp.url, hyperlink_url)
         # De-frag the url
         defragmented_url, fragment = urldefrag(absolute_url)
         parsed_url = urlparse(defragmented_url)
         # Add only urls, not triggers
         if parsed_url.scheme in {"http", "https"}:
+            if absolute_url != hyperlink_url:
+                # logging.info(f"VALID RELATIVE URL FOUND: {hyperlink_url}: {absolute_url}")
             hyperlinks.append(remove_trailing_slash(defragmented_url))
 
     return hyperlinks
