@@ -277,9 +277,10 @@ def is_valid(url: str) -> bool:
         # General regex pattern to avoid unwanted URLs
         AVOID_PATTERNS = [
             r"idx=[^&]+",  # Avoids any URL containing `idx=<anything>`
-            r"do=edit",    # Avoids edit pages
+            r"do=[^&]*",    # Avoids edit pages
             r"do=diff",    # Avoids diff/compare pages
             r"\?rev=",     # Avoids revision-specific pages
+            r"projects:maint-"
         ]
         if any(re.search(pattern, url) for pattern in AVOID_PATTERNS):
             return False
@@ -295,7 +296,9 @@ def is_valid(url: str) -> bool:
         # url must be in uci domain
         if (parsed.hostname is None
                 or (parsed.hostname.endswith("cecs.uci.edu")
-                    or parsed.hostname.endswith("eecs.uci.edu"))
+                    or parsed.hostname.endswith("eecs.uci.edu")
+                    or parsed.hostname.endswith("cgpacs.uci.edu")
+                    or parsed.hostname.endsiwth("economics.uci.edu"))
                 or not (parsed.hostname.endswith("ics.uci.edu")
                         or parsed.hostname.endswith("cs.uci.edu")
                         or parsed.hostname.endswith("informatics.uci.edu")
