@@ -144,20 +144,6 @@ def low_information_or_large_file(resp, text, tokens) -> bool:
     return False
 
 
-# # Check robots.txt for permission to crawl link
-# def can_crawl(url: str) -> bool:
-#     parsed = urlparse(url)
-#     robots_url = f"{parsed.scheme}://{parsed.netloc}/robots.txt"
-#     print(f"Robots.txt: {robots_url}")
-#     rp = RobotFileParser()
-#     rp.set_url(robots_url)
-
-#     rp.read()
-#     res = rp.can_fetch("*", url)
-#     print(f"Result: {res}, url: {url}")
-#     return rp.can_fetch("*", url)
-
-
 def scraper(url: str, resp) -> list:
 
     # logging.info(f"Scraped URL: {url}")
@@ -275,15 +261,16 @@ def is_valid(url: str) -> bool:
 
 
         # General regex pattern to avoid unwanted URLs
-        AVOID_PATTERNS = [
-            r"idx=[^&]+",  # Avoids any URL containing `idx=<anything>`
-            r"do=[^&]*",    # Avoids edit pages
-            r"do=diff",    # Avoids diff/compare pages
-            r"\?rev=",     # Avoids revision-specific pages
-            r"projects:maint-"
-        ]
-        if any(re.search(pattern, url) for pattern in AVOID_PATTERNS):
-            return False
+
+        # AVOID_PATTERNS = [
+        #     r"idx=[^&]+",  # Avoids any URL containing `idx=<anything>`
+        #     r"do=[^&]*",    # Avoids edit pages
+        #     r"do=diff",    # Avoids diff/compare pages
+        #     r"\?rev=",     # Avoids revision-specific pages
+        #     r"projects:maint-"
+        # ]
+        # if any(re.search(pattern, url) for pattern in AVOID_PATTERNS):
+        #     return False
 
         # repeating directories
         if re.match("^.*?(/.+?/).*?\1.*$|^.*?/(.+?/)\2.*$", parsed.path):
@@ -298,7 +285,7 @@ def is_valid(url: str) -> bool:
                 or (parsed.hostname.endswith("cecs.uci.edu")
                     or parsed.hostname.endswith("eecs.uci.edu")
                     or parsed.hostname.endswith("cgpacs.uci.edu")
-                    or parsed.hostname.endsiwth("economics.uci.edu"))
+                    or parsed.hostname.endswith("economics.uci.edu"))
                 or not (parsed.hostname.endswith("ics.uci.edu")
                         or parsed.hostname.endswith("cs.uci.edu")
                         or parsed.hostname.endswith("informatics.uci.edu")
